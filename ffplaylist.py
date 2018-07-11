@@ -28,6 +28,7 @@ class FFMpegManager:
         self.procinfo = None
         self.tmpdir = tempfile.mkdtemp(prefix='ffpl-')
         self.stop = threading.Event()
+        self.started = False
 
         self.plq = collections.deque()
         self.cond = threading.Condition()
@@ -55,7 +56,8 @@ class FFMpegManager:
                     fd = openfile.fd
                     newprogress = openfile.position/os.stat(filename).st_size
                     break
-            if newprogress is None or (self.currentfd and fd != self.currentfd):
+            if self.started and (
+                newprogress is None or (self.currentfd and fd != self.currentfd)):
                 with self.cond:
                     self.plq.popleft()
                     os.unlink(plname)
@@ -63,6 +65,8 @@ class FFMpegManager:
                     self.cond.notify()
                     self.currentfd = None
             else:
+                if newprogress:
+                    self.started = True
                 self.currentfd = fd
                 break
         self.progress_bar(filename, newprogress)
